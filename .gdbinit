@@ -37,9 +37,9 @@ import re
 import struct
 import traceback
 
-# User defined print methon in their program------------------------------------
-user_methons = [
-# USE THIS FORMAT: {'TYPE NAME', 'METHON IN YOU PROGRAM'}
+# User defined print methon of their program------------------------------------
+user_methons = {
+# USE THIS FORMAT: 'TYPE NAME': 'METHON IN YOU PROGRAM',
 # ONLY ONE ARGUMENT SUPPORTED!
 # Example:
 # You want print a struct like this:
@@ -61,12 +61,12 @@ user_methons = [
 # Again,
 # ONLY ONE ARGUMENT SUPPORTED!(I think that is enough, 
 # because you an pass an struction which contains all arguments you need.
-    {'BinaryTree<int>', 'debug'}
-]
+    'BinaryTree<int>': 'debug',
+}
 def user_defined_special_methon(value):
-    for type_of_program, methon in user_methons:
+    for type_of_program in user_methons:
         if str(value.type) == type_of_program:
-            return methon
+            return user_methons[type_of_program]
     return None
 # Common attributes ------------------------------------------------------------
 
@@ -338,19 +338,20 @@ def format_value(value, compact=None, name=None):
     May be it is good to insert an plugin here.
     value.dereference() is dereference pointer.
     '''
+    def is_initialized(name):
+        '''
+        Check value whether initialized or not by current line 
+        and the line where the value appear, and decide a way to run.
+        I have no idea whether it is true or not.
+        And it may do well in C/C++.
+        '''
+        current_line = gdb.selected_frame().find_sal().line
+        value_defined_line = gdb.lookup_symbol(name)[0].line
+        return value_defined_line < current_line
     methon = user_defined_special_methon(value)
-    if name != None and methon != None:
-        def is_initialized(name):
-            '''
-            Check value whether initialized or not by current line 
-            and the line where the value appear, and decide a way to run.
-            I have no idea whether it is true or not.
-            And it may do well in C/C++.
-            '''
-            current_line = gdb.selected_frame().find_sal().line
-            value_defined_line = gdb.lookup_symbol(name)[0].line
-            return value_defined_line < current_line
-        if is_initialized(name) == True:
+    print("for", value.type, name, "chosed methon:", methon)
+    if is_initialized(name) == True:
+        if name != None and methon != None:
             try:
                 resault = gdb.parse_and_eval("{}({})".format(methon, name))
                 ret = to_string(resault)
@@ -360,48 +361,27 @@ def format_value(value, compact=None, name=None):
                 t = ansi(e, R.style_error)
                 return t;
         else:
-            return "Not initialized"
+            # format the value
+            out = to_string(value)
+            # dereference up to the actual value if requested
+            if R.dereference and value.type.code == gdb.TYPE_CODE_PTR:
+                while value.type.code == gdb.TYPE_CODE_PTR:
+                    try:
+                        value = value.dereference()
+                    except gdb.error as e:
+                        break
+                else:
+                    formatted = to_string(value)
+                    out += '{} {}'.format(ansi(':', R.style_low), formatted)
+            # compact the value
+            if compact is not None and compact or R.compact_values:
+                out = re.sub(r'$\s*', '', out, flags=re.MULTILINE)
+            # truncate the value
+            if R.max_value_length > 0 and len(out) > R.max_value_length:
+                out = out[0:R.max_value_length] + ansi(R.value_truncation_string, R.style_critical)
+            return out
     else:
-        # format the value
-        out = to_string(value)
-        # dereference up to the actual value if requested
-        if R.dereference and value.type.code == gdb.TYPE_CODE_PTR:
-            while value.type.code == gdb.TYPE_CODE_PTR:
-                try:
-                    value = value.dereference()
-                except gdb.error as e:
-                    break
-            else:
-                formatted = to_string(value)
-                out += '{} {}'.format(ansi(':', R.style_low), formatted)
-        # compact the value
-        if compact is not None and compact or R.compact_values:
-            out = re.sub(r'$\s*', '', out, flags=re.MULTILINE)
-        # truncate the value
-        if R.max_value_length > 0 and len(out) > R.max_value_length:
-            out = out[0:R.max_value_length] + ansi(R.value_truncation_string, R.style_critical)
-        return out
-    '''
-    # format the value
-    out = to_string(value)
-    # dereference up to the actual value if requested
-    if R.dereference and value.type.code == gdb.TYPE_CODE_PTR:
-        while value.type.code == gdb.TYPE_CODE_PTR:
-            try:
-                value = value.dereference()
-            except gdb.error as e:
-                break
-        else:
-            formatted = to_string(value)
-            out += '{} {}'.format(ansi(':', R.style_low), formatted)
-    # compact the value
-    if compact is not None and compact or R.compact_values:
-        out = re.sub(r'$\s*', '', out, flags=re.MULTILINE)
-    # truncate the value
-    if R.max_value_length > 0 and len(out) > R.max_value_length:
-        out = out[0:R.max_value_length] + ansi(R.value_truncation_string, R.style_critical)
-    return out
-    '''
+        return "Not initialized"
 
 # XXX parsing the output of `info breakpoints` is apparently the best option
 # right now, see: https://sourceware.org/bugzilla/show_bug.cgi?id=18385
