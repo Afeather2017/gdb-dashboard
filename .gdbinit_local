@@ -1,0 +1,23 @@
+#a::b
+#gets b from function a
+#*a@b
+#gets array a as size b
+#skip -file 
+alias st=start
+skip -gfile /usr/include/*
+skip -rfunction std::*
+set step-mode off
+
+alias db=dashboard
+alias dbo=dashboard -output
+alias cls=!clear
+
+dashboard -layout source variables 
+dashboard variables -style compact False
+dashboard variables -style align True
+dashboard -style max_value_length 65535
+dashboard -style compact_values False
+
+dashboard source -style highlight-line True
+dashboard -style style_selected_1 '1;32;21'
+

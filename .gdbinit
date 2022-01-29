@@ -37,6 +37,37 @@ import re
 import struct
 import traceback
 
+# User defined print methon in their program------------------------------------
+user_methons = [
+# USE THIS FORMAT: {'TYPE NAME', 'METHON IN YOU PROGRAM'}
+# ONLY ONE ARGUMENT SUPPORTED!
+# Example:
+# You want print a struct like this:
+# struct TreeNode{
+#     struct TreeNode* left, *right,
+#     int val;
+# }binary_tree;
+# print the binary tree
+#           ╭╴d
+#         ╭╴a
+#         c
+#         │ ╭╴e
+#         ╰╴b
+#           ╰╴f
+# make a function which returns a string which contains the tree.
+# Let's call the function "PrintBinaryTree".
+# Then you write {'TreeNode', 'PrintBinaryTree'}.
+# Then program will call PrintBinaryTree(binary_tree).
+# Again,
+# ONLY ONE ARGUMENT SUPPORTED!(I think that is enough, 
+# because you an pass an struction which contains all arguments you need.
+    {'BinaryTree<int>', 'debug'}
+]
+def user_defined_special_methon(value):
+    for type_of_program, methon in user_methons:
+        if str(value.type) == type_of_program:
+            return methon
+    return None
 # Common attributes ------------------------------------------------------------
 
 class R():
@@ -290,7 +321,7 @@ def format_address(address):
     pointer_size = gdb.parse_and_eval('$pc').type.sizeof
     return ('0x{{:0{}x}}').format(pointer_size * 2).format(address)
 
-def format_value(value, compact=None):
+def format_value(value, compact=None, name=None):
     # format references as referenced values
     # (TYPE_CODE_RVALUE_REF is not supported by old GDB)
     if value.type.code in (getattr(gdb, 'TYPE_CODE_REF', None),
@@ -299,6 +330,58 @@ def format_value(value, compact=None):
             value = value.referenced_value()
         except gdb.error as e:
             return ansi(e, R.style_error)
+
+    '''
+    # TODO: Insert an plugin to show value or cancel namespace, template and type
+    print(value.type, value.type.code)
+    value.type is the type of selected value.
+    May be it is good to insert an plugin here.
+    value.dereference() is dereference pointer.
+    '''
+    methon = user_defined_special_methon(value)
+    if name != None and methon != None:
+        def is_initialized(name):
+            '''
+            Check value whether initialized or not by current line 
+            and the line where the value appear, and decide a way to run.
+            I have no idea whether it is true or not.
+            And it may do well in C/C++.
+            '''
+            current_line = gdb.selected_frame().find_sal().line
+            value_defined_line = gdb.lookup_symbol(name)[0].line
+            return value_defined_line < current_line
+        if is_initialized(name) == True:
+            try:
+                resault = gdb.parse_and_eval("{}({})".format(methon, name))
+                ret = to_string(resault)
+                ret = eval(ret)
+                return ret
+            except Exception as e:
+                t = ansi(e, R.style_error)
+                return t;
+        else:
+            return "Not initialized"
+    else:
+        # format the value
+        out = to_string(value)
+        # dereference up to the actual value if requested
+        if R.dereference and value.type.code == gdb.TYPE_CODE_PTR:
+            while value.type.code == gdb.TYPE_CODE_PTR:
+                try:
+                    value = value.dereference()
+                except gdb.error as e:
+                    break
+            else:
+                formatted = to_string(value)
+                out += '{} {}'.format(ansi(':', R.style_low), formatted)
+        # compact the value
+        if compact is not None and compact or R.compact_values:
+            out = re.sub(r'$\s*', '', out, flags=re.MULTILINE)
+        # truncate the value
+        if R.max_value_length > 0 and len(out) > R.max_value_length:
+            out = out[0:R.max_value_length] + ansi(R.value_truncation_string, R.style_critical)
+        return out
+    '''
     # format the value
     out = to_string(value)
     # dereference up to the actual value if requested
@@ -318,6 +401,7 @@ def format_value(value, compact=None):
     if R.max_value_length > 0 and len(out) > R.max_value_length:
         out = out[0:R.max_value_length] + ansi(R.value_truncation_string, R.style_critical)
     return out
+    '''
 
 # XXX parsing the output of `info breakpoints` is apparently the best option
 # right now, see: https://sourceware.org/bugzilla/show_bug.cgi?id=18385
@@ -1612,7 +1696,7 @@ class Variables(Dashboard.Module):
         for elem in data or []:
             name = ansi(elem.sym, R.style_high) + ' ' * (name_width - len(str(elem.sym)))
             equal = ansi('=', R.style_low)
-            value = format_value(elem.sym.value(frame), compact)
+            value = format_value(elem.sym.value(frame), compact, elem.sym.name)
             lines.append('{} {} {}'.format(name, equal, value))
         if sort:
             lines.sort()
@@ -2301,12 +2385,12 @@ set print pretty on
 set print array off
 set print array-indexes on
 set python print-stack full
-
 # Start ------------------------------------------------------------------------
 
 python Dashboard.start()
 
 # File variables ---------------------------------------------------------------
+source ~/.gdbinit_local
 
 # vim: filetype=python
 # Local Variables:
