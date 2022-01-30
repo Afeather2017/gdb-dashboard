@@ -10,14 +10,19 @@ set step-mode off
 
 alias db=dashboard
 alias dbo=dashboard -output
+alias dbv=dashboard -variables
+alias dbl=dashboard -layout
 alias cls=!clear
 
 dashboard -layout source variables 
 dashboard variables -style compact False
 dashboard variables -style align True
-dashboard -style max_value_length 65535
+dashboard -style max_value_length 100
 dashboard -style compact_values False
 
 dashboard source -style highlight-line True
 dashboard -style style_selected_1 '1;32;21'
 
+define typeof
+	python print(gdb.lookup_symbol("$arg0")[0].name, "is", gdb.lookup_symbol("$arg0")[0].type)
+end

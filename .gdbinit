@@ -39,10 +39,15 @@ import traceback
 
 # User defined print methon of their program------------------------------------
 user_methons = {
-# USE THIS FORMAT: 'TYPE NAME': 'METHON IN YOU PROGRAM',
+# USE FORMAT: 'TYPE NAME': 'METHON IN YOU PROGRAM' or
+# python
+# user_methons['TYPE NAME'] = 'METHON IN YOU PROGRAM' in a script
+# end
+
+
 # ONLY ONE ARGUMENT SUPPORTED!
 # Example:
-# You want print a struct like this:
+# You want print a binary tree expressed by struct like this:
 # struct TreeNode{
 #     struct TreeNode* left, *right,
 #     int val;
@@ -54,15 +59,19 @@ user_methons = {
 #         │ ╭╴e
 #         ╰╴b
 #           ╰╴f
-# make a function which returns a string which contains the tree.
-# Let's call the function "PrintBinaryTree".
+# make a function which returns a string which expresses the tree.
+# Let's name the function "PrintBinaryTree".
 # Then you write {'TreeNode', 'PrintBinaryTree'}.
 # Then program will call PrintBinaryTree(binary_tree).
+# I think you'd better run "python print(gdb.lookup_symbol('YOU VARIABLE')[0].type)"
+# or command 'typeof' which I defined at .gdbinit_local
+# to show the type of you variable before you write anything here.
 # Again,
 # ONLY ONE ARGUMENT SUPPORTED!(I think that is enough, 
 # because you an pass an struction which contains all arguments you need.
-    'BinaryTree<int>': 'debug',
+# Something I can't solve:
 }
+tip_showed = False
 def user_defined_special_methon(value):
     for type_of_program in user_methons:
         if str(value.type) == type_of_program:
@@ -349,7 +358,10 @@ def format_value(value, compact=None, name=None):
         value_defined_line = gdb.lookup_symbol(name)[0].line
         return value_defined_line < current_line
     methon = user_defined_special_methon(value)
-    print("for", value.type, name, "chosed methon:", methon)
+    global tip_showed
+    if len(user_methons) == 0 and tip_showed == False:
+        print("\x1b[1;35mDid you run your script in gdb?\x1b[0m")
+        tip_showed = True
     if is_initialized(name) == True:
         if name != None and methon != None:
             try:
@@ -1675,6 +1687,7 @@ class Variables(Dashboard.Module):
             name_width = max(len(str(elem.sym)) for elem in data) if data else 0
         for elem in data or []:
             name = ansi(elem.sym, R.style_high) + ' ' * (name_width - len(str(elem.sym)))
+            print(dir(elem.sym), dir(elem.val), dir(elem.value))
             equal = ansi('=', R.style_low)
             value = format_value(elem.sym.value(frame), compact, elem.sym.name)
             lines.append('{} {} {}'.format(name, equal, value))
